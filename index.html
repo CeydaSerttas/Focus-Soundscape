@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Focus Soundscape — Ambient Mixer</title>
+  <style>
+    :root{ --radius:18px; --shadow:0 16px 50px rgba(0,0,0,.18); --border:1px solid var(--stroke); }
+    body.theme-light{
+      --bg: radial-gradient(1000px 600px at 15% 10%, #f8b4d9 0, transparent 60%),
+            radial-gradient(900px 600px at 85% 90%, #fbbcdc 0, transparent 60%),
+            linear-gradient(160deg, #fce7f3, #fdf2f8 60%);
+      --card:#ffffffd9; --stroke:#f9a8d4; --text:#831843; --muted:#ec4899; --accent:#ec4899;
+      --good:#16a34a; --warn:#ef4444; --chip:#fce7f3; --chipText:#831843;
+      --gradient-start:#fbbcdc; --gradient-mid:#f9a8d4; --gradient-end:#ec4899;
+    }
+    body.theme-dark{
+      --bg: radial-gradient(1200px 700px at 12% 18%, #064e3b 0, transparent 55%),
+            radial-gradient(1000px 700px at 82% 88%, #14532d 0, transparent 55%),
+            linear-gradient(160deg, #022c22, #14532d 70%);
+      --card:#0f1222cc; --stroke:#10b981; --text:#a7f3d0; --muted:#6ee7b7; --accent:#34d399;
+      --good:#22c55e; --warn:#f87171; --chip:#064e3b; --chipText:#a7f3d0;
+      --gradient-start:#065f46; --gradient-mid:#10b981; --gradient-end:#34d399;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0; background:var(--bg); color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial; display:grid; place-items:center}
+    .wrap{width:min(1100px,94vw); padding:18px}
+
+    .card{background:var(--card); backdrop-filter: blur(20px); border:var(--border); box-shadow:var(--shadow); border-radius:var(--radius)}
+
+    .topbar{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; margin-bottom:16px; flex-wrap:wrap}
+    .topbar h1{margin:0; font-size:clamp(20px,3.6vw,32px); display:flex; gap:10px; align-items:center}
+    .topbar .sub{font-weight:400; color:var(--muted)}
+
+    .actions{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+    .inline{display:flex; gap:6px; align-items:center}
+    .sep{width:1px; height:22px; background:color-mix(in oklab, var(--stroke) 60%, transparent)}
+
+    .btn{background:transparent; border:var(--border); color:var(--text); padding:10px 14px; border-radius:12px; font-weight:700; cursor:pointer; white-space:nowrap; transition: all 0.2s}
+    .btn:hover{opacity:0.9; transform:translateY(-1px)}
+    .btn.primary{background:linear-gradient(180deg, color-mix(in oklab, var(--accent) 80%, white), var(--accent)); color:#fff; border-color:transparent}
+    .btn.danger{background:linear-gradient(180deg, color-mix(in oklab, var(--warn) 80%, white), var(--warn)); color:#fff; border-color:transparent}
+    .btn.ghost{background:var(--chip); color:var(--text); border-color:transparent}
+    .btn.small{padding:6px 10px; font-size:12px}
+
+    .grid{display:grid; grid-template-columns: 1.6fr .4fr; gap:12px}
+    @media(max-width: 768px) { .grid{grid-template-columns: 1fr} }
+
+    #mixer{padding:12px; display:grid; grid-template-columns: repeat(2, 1fr); gap:12px}
+    @media(min-width:980px){ #mixer{ grid-template-columns: repeat(3, 1fr) } }
+    @media(max-width: 480px){ #mixer{ grid-template-columns: 1fr } }
+    
+    .channel{background:var(--chip); color:var(--chipText); border:2px solid var(--gradient-start); border-radius:12px; padding:12px; display:grid; gap:10px; min-height:180px; transition: all 0.3s}
+    .channel:hover{border-color:var(--gradient-end); transform:translateY(-2px)}
+    .channel.loading{opacity:0.7; pointer-events:none}
+    .channel.error{opacity:0.5; border-color:var(--warn)}
+    
+    .ch-head{display:flex; align-items:center; justify-content:space-between}
+    .ch-title{display:flex; gap:10px; align-items:center; font-weight:800; color:var(--text); font-size:14px}
+    
+    .ch-ctrls{display:grid; gap:12px; flex:1}
+    
+    .slider-group{display:grid; gap:8px}
+    .slider-labels{display:flex; justify-content:space-between; font-size:11px; color:var(--muted)}
+    
+    .spectrum-slider{
+      position:relative;
+      height:36px;
+      border-radius:18px;
+      background: linear-gradient(90deg, 
+        var(--gradient-start) 0%, 
+        var(--gradient-mid) 50%, 
+        var(--gradient-end) 100%
+      );
+      padding:3px;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .spectrum-slider input[type="range"]{
+      width:100%;
+      height:30px;
+      -webkit-appearance:none;
+      appearance:none;
+      background:transparent;
+      margin:0;
+      cursor:pointer;
+    }
+    
+    .spectrum-slider input[type="range"]::-webkit-slider-track{
+      background:transparent;
+      height:30px;
+    }
+    
+    .spectrum-slider input[type="range"]::-webkit-slider-thumb{
+      -webkit-appearance:none;
+      width:24px;
+      height:24px;
+      background:#fff;
+      border-radius:50%;
+      border:3px solid var(--accent);
+      box-shadow:0 2px 8px rgba(0,0,0,0.3);
+      cursor:pointer;
+      transition: transform 0.2s;
+    }
+    
+    .spectrum-slider input[type="range"]::-webkit-slider-thumb:hover{
+      transform:scale(1.1);
+    }
+    
+    .spectrum-slider input[type="range"]::-moz-range-track{
+      background:transparent;
+      height:30px;
+    }
+    
+    .spectrum-slider input[type="range"]::-moz-range-thumb{
+      width:24px;
+      height:24px;
+      background:#fff;
+      border-radius:50%;
+      border:3px solid var(--accent);
+      box-shadow:0 2px 8px rgba(0,0,0,0.3);
+      cursor:pointer;
+      transition: transform 0.2s;
+    }
+    
+    .vol-progress{
+      height:6px;
+      background:color-mix(in oklab, var(--gradient-start) 20%, transparent);
+      border-radius:3px;
+      margin-top:4px;
+      overflow:hidden;
+    }
+    
+    .vol-fill{
+      height:100%;
+      background: linear-gradient(90deg, var(--gradient-mid), var(--gradient-end));
+      transition:width 0.2s ease;
+      border-radius:3px;
+    }
+    
+    .buttons-row{display:flex; gap:6px; justify-content:center}
+    
+    .badge{padding:4px 8px; border-radius:999px; border:1px solid var(--gradient-mid); font-size:12px; color:var(--text); background:color-mix(in oklab, var(--gradient-start) 20%, transparent); font-weight:600}
+    .badge.flash{position:fixed; top:20px; right:20px; z-index:999; animation:fadeOut 2s ease-out forwards; padding:12px 20px; font-size:14px}
+    @keyframes fadeOut{ 0%{opacity:0; transform:translateY(-10px)} 20%{opacity:1; transform:translateY(0)} 80%{opacity:1} 100%{opacity:0} }
+    
+    .muted{color:var(--muted)}
+    .small{font-size:12px}
+
+    .side{padding:12px; display:grid; gap:12px}
+    .presets{display:flex; flex-wrap:wrap; gap:8px}
+    .row{display:flex; gap:8px; flex-wrap:wrap}
+
+    .meta{margin-top:10px; color:var(--muted); font-size:13px}
+
+    input[type="range"].master-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+      cursor: pointer;
+      width: 120px;
+      height: 20px;
+    }
+    
+    input[type="range"].master-slider::-webkit-slider-track {
+      background: linear-gradient(90deg, var(--gradient-start), var(--gradient-end));
+      height: 6px;
+      border-radius: 3px;
+    }
+    
+    input[type="range"].master-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 18px;
+      width: 18px;
+      border-radius: 50%;
+      background: #fff;
+      border: 2px solid var(--accent);
+      cursor: pointer;
+      margin-top: -6px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    input[type="range"].master-slider::-moz-range-track {
+      background: linear-gradient(90deg, var(--gradient-start), var(--gradient-end));
+      height: 6px;
+      border-radius: 3px;
+    }
+    
+    input[type="range"].master-slider::-moz-range-thumb {
+      height: 18px;
+      width: 18px;
+      border-radius: 50%;
+      background: #fff;
+      border: 2px solid var(--accent);
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+
+    select {
+      background:var(--chip); 
+      border:2px solid var(--gradient-start); 
+      color:var(--text); 
+      padding:8px 12px; 
+      border-radius:8px; 
+      outline:none;
+      cursor:pointer;
+      font-weight:600;
+    }
+
+    .spinner{width:16px; height:16px; border:2px solid var(--gradient-start); border-top:2px solid var(--gradient-end); border-radius:50%; animation:spin 1s linear infinite; display:inline-block}
+    @keyframes spin{ 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
+  </style>
+</head>
+<body class="theme-light">
+  <div class="wrap">
+    <header class="topbar card">
+      <h1>🎧 Focus Soundscape <span class="sub">— Ambient Mixer</span></h1>
+      <div class="actions">
+        <button id="theme" class="btn">🌙 Dark / ☀️ Light</button>
+        <button id="playAll" class="btn primary">▶︎ Play all</button>
+        <button id="pauseAll" class="btn">⏸ Pause</button>
+        <button id="stopAll" class="btn">⏹ Stop</button>
+        <div class="sep"></div>
+        <label class="inline">Master
+          <input id="master" type="range" min="0" max="1" step="0.01" value="0.7" class="master-slider">
+        </label>
+        <div class="sep"></div>
+        <label class="inline">Timer
+          <select id="timerSelect">
+            <option value="0">Off</option>
+            <option value="15">15 min</option>
+            <option value="30">30 min</option>
+            <option value="60">60 min</option>
+            <option value="90">90 min</option>
+          </select>
+        </label>
+        <button id="startTimer" class="btn">⏱ Start</button>
+        <span id="timeLeft" class="muted"></span>
+      </div>
+    </header>
+
+    <main class="grid">
+      <section class="card" id="mixer"></section>
+
+      <aside class="card side">
+        <h3>🎵 Mix Presets</h3>
+        <div class="presets">
+          <button class="btn ghost" data-preset="rain">🌧 Deep Rain</button>
+          <button class="btn ghost" data-preset="cafe">☕️ Café Focus</button>
+          <button class="btn ghost" data-preset="night">🌌 Night Reads</button>
+          <button class="btn ghost" data-preset="train">🚆 Old Train</button>
+          <button class="btn ghost" data-preset="underwater">🫧 Underwater Calm</button>
+        </div>
+        <div class="row">
+          <button id="saveMix" class="btn">💾 Save current mix</button>
+          <button id="loadMix" class="btn">↩︎ Load saved</button>
+          <button id="resetMix" class="btn danger">🔄 Reset</button>
+        </div>
+        <p class="muted small">
+          🎧 Sounds play in a loop. Your volumes and theme are remembered on this device.
+        </p>
+        <div class="row">
+          <button id="testAudio" class="btn ghost">🔊 Test Audio</button>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="meta">
+      💡 Tip: Use keyboard shortcuts - <b>Space</b>=Play/Pause, <b>M</b>=Mute All. Sounds are in the sounds/ folder.
+    </footer>
+  </div>
+
+  <script>
+    (function () {
+      const $ = (sel, ctx = document) => ctx.querySelector(sel);
+      const $$ = (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
+
+      const body = document.body;
+      const savedTheme = localStorage.getItem("fs_theme");
+      body.classList.toggle("theme-dark", savedTheme === "dark");
+      body.classList.toggle("theme-light", savedTheme !== "dark");
+      $("#theme").addEventListener("click", () => {
+        const dark = !body.classList.contains("theme-dark");
+        body.classList.toggle("theme-dark", dark);
+        body.classList.toggle("theme-light", !dark);
+        localStorage.setItem("fs_theme", dark ? "dark" : "light");
+      });
+
+      const channels = [
+        {
+          id: "rain",
+          emoji: "🌧",
+          name: "Winter Rain",
+          file: "assets/sounds/winter-rain-in-oak-forest-loop-185672.mp3",
+          vol: 0.8,
+        },
+        {
+          id: "rain2",
+          emoji: "🌦",
+          name: "Calming Rain",
+          file: "assets/sounds/calming-rain-257596.mp3",
+          vol: 0.6,
+        },
+        {
+          id: "cafe",
+          emoji: "☕",
+          name: "Outdoor Café",
+          file: "assets/sounds/outdoor-cafe-in-university-51657.mp3",
+          vol: 0.5,
+        },
+        {
+          id: "night",
+          emoji: "🌌",
+          name: "Night Ambience",
+          file: "assets/sounds/night-ambience-17064.mp3",
+          vol: 0.5,
+        },
+        {
+          id: "train",
+          emoji: "🚆",
+          name: "Old Train",
+          file: "assets/sounds/inside-old-train-169418.mp3",
+          vol: 0.4,
+        },
+        {
+          id: "under",
+          emoji: "🫧",
+          name: "Underwater",
+          file: "assets/sounds/underwaterambience-181406.mp3",
+          vol: 0.6,
+        },
+      ];
+
+      console.log("🎵 Focus Soundscape Loaded");
+      console.log("Expected audio files:");
+      channels.forEach(ch => {
+        console.log(`  ${ch.emoji} ${ch.name}: ${ch.file}`);
+      });
+      console.log("Make sure these files exist in the sounds/ folder!");
+      
+      window.addEventListener('load', () => {
+        console.log("Checking audio files...");
+        channels.forEach(ch => {
+          fetch(ch.file, { method: 'HEAD' })
+            .then(() => console.log(`✅ Found: ${ch.file}`))
+            .catch(() => console.error(`❌ Missing: ${ch.file}`));
+        });
+      });
+      const STATE_KEY = "fs_state_v2";
+      let state = JSON.parse(localStorage.getItem(STATE_KEY) || "{}");
+      const master = $("#master");
+      if (state.master != null) master.value = state.master;
+
+      let globalMuted = false;
+      let isPlaying = false;
+
+      const mixer = $("#mixer");
+      channels.forEach((ch) => {
+        const savedVol = state[ch.id]?.vol ?? ch.vol;
+        const card = document.createElement("div");
+        card.className = "channel";
+        card.id = "ch-" + ch.id;
+        card.innerHTML = `
+          <div class="ch-head">
+            <div class="ch-title">${ch.emoji} <span>${ch.name}</span></div>
+            <span class="badge" id="badge-${ch.id}">${Math.round(savedVol * 100)}%</span>
+          </div>
+          <div class="ch-ctrls">
+            <div class="slider-group">
+              <div class="slider-labels">
+                <span>🔇 Off</span>
+                <span>🔊 Max</span>
+              </div>
+              <div class="spectrum-slider">
+                <input id="vol-${ch.id}" type="range" min="0" max="1" step="0.01" value="${savedVol}" />
+              </div>
+              <div class="vol-progress">
+                <div class="vol-fill" id="fill-${ch.id}" style="width: ${savedVol * 100}%"></div>
+              </div>
+            </div>
+            <div class="buttons-row">
+              <button id="mute-${ch.id}" class="btn small ghost">🔇 Mute</button>
+              <button id="solo-${ch.id}" class="btn small ghost">🎚 Solo</button>
+            </div>
+          </div>`;
+        mixer.appendChild(card);
+      });
+
+      const audios = {};
+      channels.forEach((ch) => {
+        const a = new Audio();
+        a.loop = true;
+        a.preload = "none";
+        a.volume = (state[ch.id]?.vol ?? ch.vol) * parseFloat(master.value);
+        
+        a.src = ch.file;
+        
+        a.addEventListener('error', (e) => {
+          console.error(`Failed to load: ${ch.file}`, e);
+          const card = $("#ch-" + ch.id);
+          card.classList.add('error');
+          card.classList.remove('loading');
+          flash(`⚠️ ${ch.name} failed to load`);
+        });
+        
+        a.addEventListener('loadstart', () => {
+          const card = $("#ch-" + ch.id);
+          card.classList.add('loading');
+          const badge = $("#badge-" + ch.id);
+          badge.innerHTML = '<span class="spinner"></span>';
+        });
+        
+        a.addEventListener('canplaythrough', () => {
+          const card = $("#ch-" + ch.id);
+          card.classList.remove('loading');
+          card.classList.remove('error');
+          const badge = $("#badge-" + ch.id);
+          const vol = state[ch.id]?.vol ?? channels.find(c => c.id === ch.id).vol;
+          badge.textContent = Math.round(vol * 100) + "%";
+        });
+        
+        audios[ch.id] = a;
+      });
+
+      $("#testAudio").addEventListener('click', async () => {
+        flash("🔊 Testing audio system...");
+        
+        try {
+          const ctx = new (window.AudioContext || window.webkitAudioContext)();
+          
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          
+          osc.frequency.setValueAtTime(440, ctx.currentTime); 
+          osc.type = 'sine';
+          gain.gain.setValueAtTime(0.1, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+          
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.5);
+          
+          flash("✅ Audio system works!");
+        } catch (e) {
+          flash("❌ Audio system error!");
+          console.error(e);
+        }
+        
+        console.log("Testing audio files:");
+        for (const ch of channels) {
+          console.log(`File: ${ch.file}`);
+          const testAudio = new Audio(ch.file);
+          testAudio.volume = 0.1;
+          
+          testAudio.addEventListener('canplay', () => {
+            console.log(`✅ Can play: ${ch.name}`);
+          });
+          
+          testAudio.addEventListener('error', (e) => {
+            console.error(`❌ Cannot play: ${ch.name}`, e);
+          });
+          
+          testAudio.load();
+        }
+        
+        console.log("Check console for audio file status!");
+      });
+
+      function save() {
+        localStorage.setItem(STATE_KEY, JSON.stringify(state));
+      }
+      
+      function setVol(id, v) {
+        state[id] = state[id] || {};
+        state[id].vol = v;
+        $("#badge-" + id).textContent = Math.round(v * 100) + "%";
+        const m = parseFloat(master.value);
+        audios[id].volume = v * m;
+        
+        const fill = $("#fill-" + id);
+        if (fill) fill.style.width = (v * 100) + "%";
+        
+        save();
+      }
+      
+      function fadeAudio(audio, to = 0, ms = 800) {
+        const from = audio.volume;
+        const start = performance.now();
+        function step(t) {
+          const p = Math.min(1, (t - start) / ms);
+          audio.volume = from + (to - from) * p;
+          if (p < 1) requestAnimationFrame(step);
+          else audio.volume = to;
+        }
+        requestAnimationFrame(step);
+      }
+      
+      async function playAll() {
+        if (isPlaying) return;
+        
+        flash("🎵 Starting playback...");
+        
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (AudioContext) {
+          const ctx = new AudioContext();
+          if (ctx.state === 'suspended') {
+            await ctx.resume();
+          }
+        }
+        
+        let successCount = 0;
+        let errorCount = 0;
+        
+        for (const ch of channels) {
+          try {
+            if (!audios[ch.id].src) {
+              audios[ch.id].src = ch.file;
+            }
+            
+            await audios[ch.id].play();
+            successCount++;
+            console.log(`✅ Playing: ${ch.name}`);
+          } catch (error) {
+            errorCount++;
+            console.error(`❌ Failed to play ${ch.name}:`, error);
+            
+            try {
+              audios[ch.id].load();
+              await new Promise(resolve => setTimeout(resolve, 100));
+              await audios[ch.id].play();
+              successCount++;
+              errorCount--;
+              console.log(`✅ Playing after reload: ${ch.name}`);
+            } catch (e) {
+              console.error(`❌ Still failed: ${ch.name}`, e);
+            }
+          }
+        }
+        
+        isPlaying = successCount > 0;
+        
+        if (successCount > 0) {
+          flash(`▶️ Playing ${successCount} sounds`);
+        } else {
+          flash("⚠️ No sounds could play - check console");
+        }
+        
+        globalMuted = false;
+      }
+      
+      function pauseAll() {
+        Object.values(audios).forEach(a => a.pause());
+        isPlaying = false;
+        flash("⏸ Paused");
+      }
+      
+      function stopAll() {
+        Object.values(audios).forEach(a => {
+          fadeAudio(a, 0, 800);
+          setTimeout(() => {
+            a.pause();
+            a.currentTime = 0;
+          }, 820);
+        });
+        isPlaying = false;
+        flash("⏹ Stopped");
+      }
+
+      channels.forEach((ch) => {
+        const slider = $("#vol-" + ch.id);
+        slider.addEventListener("input", (e) => {
+          setVol(ch.id, parseFloat(e.target.value));
+        });
+        
+        const muteBtn = $("#mute-" + ch.id);
+        muteBtn.addEventListener("click", () => {
+          state[ch.id] = state[ch.id] || {};
+          state[ch.id].muted = !state[ch.id].muted;
+          save();
+          audios[ch.id].muted = !!state[ch.id].muted;
+          muteBtn.textContent = state[ch.id].muted ? "🔈 Unmute" : "🔇 Mute";
+          muteBtn.style.opacity = state[ch.id].muted ? "0.5" : "1";
+        });
+        
+        const soloBtn = $("#solo-" + ch.id);
+        soloBtn.addEventListener("click", () => {
+          const soloNow = !state[ch.id]?.solo;
+          
+          channels.forEach((x) => {
+            state[x.id] = state[x.id] || {};
+            state[x.id].solo = false;
+            $("#solo-" + x.id).style.opacity = "1";
+          });
+          
+          if (soloNow) {
+            state[ch.id].solo = true;
+            soloBtn.style.opacity = "0.5";
+            channels.forEach((x) => {
+              if (x.id !== ch.id) {
+                audios[x.id].muted = true;
+                $("#mute-" + x.id).textContent = "🔈 Unmute";
+              } else {
+                audios[x.id].muted = false;
+                $("#mute-" + x.id).textContent = "🔇 Mute";
+              }
+            });
+            flash(`🎚 Solo: ${ch.name}`);
+          } else {
+            channels.forEach((x) => {
+              audios[x.id].muted = !!state[x.id]?.muted;
+              $("#mute-" + x.id).textContent = state[x.id]?.muted ? "🔈 Unmute" : "🔇 Mute";
+            });
+            flash("🎚 Solo off");
+          }
+          
+          save();
+        });
+        
+        if (state[ch.id]?.muted) {
+          audios[ch.id].muted = true;
+          muteBtn.textContent = "🔈 Unmute";
+          muteBtn.style.opacity = "0.5";
+        }
+      });
+
+      master.addEventListener("input", () => {
+        state.master = parseFloat(master.value);
+        save();
+        channels.forEach((ch) => {
+          const v = (state[ch.id]?.vol ?? ch.vol) * state.master;
+          audios[ch.id].volume = v;
+        });
+      });
+
+      $("#playAll").addEventListener("click", playAll);
+      $("#pauseAll").addEventListener("click", pauseAll);
+      $("#stopAll").addEventListener("click", stopAll);
+
+      document.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+        
+        if (e.code === 'Space') {
+          e.preventDefault();
+          if (isPlaying) pauseAll();
+          else playAll();
+        }
+        
+        if (e.key === 'm' || e.key === 'M') {
+          e.preventDefault();
+          globalMuted = !globalMuted;
+          Object.values(audios).forEach(a => a.muted = globalMuted);
+          flash(globalMuted ? "🔇 All muted" : "🔈 All unmuted");
+        }
+      });
+
+      const PRESETS = {
+        rain: {
+          rain: 0.9,
+          rain2: 0.7,
+          cafe: 0.0,
+          night: 0.0,
+          train: 0.0,
+          under: 0.0,
+        },
+        cafe: {
+          rain: 0.25,
+          rain2: 0.0,
+          cafe: 0.7,
+          night: 0.2,
+          train: 0.0,
+          under: 0.0,
+        },
+        night: {
+          rain: 0.15,
+          rain2: 0.0,
+          cafe: 0.0,
+          night: 0.7,
+          train: 0.0,
+          under: 0.2,
+        },
+        train: {
+          rain: 0.0,
+          rain2: 0.0,
+          cafe: 0.2,
+          night: 0.2,
+          train: 0.8,
+          under: 0.0,
+        },
+        underwater: {
+          rain: 0.1,
+          rain2: 0.0,
+          cafe: 0.0,
+          night: 0.2,
+          train: 0.0,
+          under: 0.8,
+        },
+      };
+      
+      $$(".presets .btn").forEach((b) =>
+        b.addEventListener("click", () => {
+          const p = PRESETS[b.dataset.preset];
+          if (!p) return;
+          Object.entries(p).forEach(([id, v]) => {
+            const slider = $("#vol-" + id);
+            if (slider) {
+              slider.value = v;
+              setVol(id, v);
+            }
+          });
+          playAll();
+          flash(`🎵 ${b.textContent} preset loaded`);
+        })
+      );
+
+      $("#saveMix").addEventListener("click", () => {
+        localStorage.setItem("fs_saved_mix", JSON.stringify(state));
+        flash("💾 Mix saved successfully!");
+      });
+      
+      $("#loadMix").addEventListener("click", () => {
+        const s = JSON.parse(localStorage.getItem("fs_saved_mix") || "null");
+        if (!s) {
+          flash("❌ No saved mix found");
+          return;
+        }
+        state = s;
+        if (state.master != null) {
+          master.value = state.master;
+          master.dispatchEvent(new Event("input"));
+        }
+        channels.forEach((ch) => {
+          const v = state[ch.id]?.vol ?? ch.vol;
+          const sl = $("#vol-" + ch.id);
+          if (sl) {
+            sl.value = v;
+            setVol(ch.id, v);
+          }
+          audios[ch.id].muted = !!state[ch.id]?.muted;
+          $("#mute-" + ch.id).textContent = audios[ch.id].muted ? "🔈 Unmute" : "🔇 Mute";
+        });
+        flash("↩︎ Mix loaded successfully!");
+      });
+      
+      $("#resetMix").addEventListener("click", () => {
+        if (!confirm("Reset all volumes to default?")) return;
+        state = { master: 0.7 };
+        master.value = 0.7;
+        master.dispatchEvent(new Event("input"));
+        channels.forEach((ch) => {
+          const def = ch.vol;
+          $("#vol-" + ch.id).value = def;
+          setVol(ch.id, def);
+          audios[ch.id].muted = false;
+          $("#mute-" + ch.id).textContent = "🔇 Mute";
+          $("#mute-" + ch.id).style.opacity = "1";
+        });
+        save();
+        flash("🔄 Reset complete!");
+      });
+
+      const sel = $("#timerSelect");
+      const btn = $("#startTimer");
+      const left = $("#timeLeft");
+      let timer = null,
+        endAt = 0;
+      
+      btn.addEventListener("click", () => {
+        const mins = parseInt(sel.value, 10);
+        if (!mins) {
+          clearInterval(timer);
+          left.textContent = "";
+          flash("⏱ Timer stopped");
+          return;
+        }
+        endAt = Date.now() + mins * 60 * 1000;
+        left.textContent = formatLeft();
+        clearInterval(timer);
+        timer = setInterval(() => {
+          const ms = endAt - Date.now();
+          if (ms <= 0) {
+            clearInterval(timer);
+            left.textContent = "";
+            stopAll();
+            flash("⏰ Time's up! Sounds stopped.");
+          } else left.textContent = formatLeft();
+        }, 500);
+        flash(`⏱ Timer set for ${mins} minutes`);
+      });
+      
+      function formatLeft() {
+        const s = Math.max(0, Math.round((endAt - Date.now()) / 1000));
+        const m = Math.floor(s / 60);
+        const ss = String(s % 60).padStart(2, "0");
+        return `⏱ ${m}:${ss}`;
+      }
+
+      function flash(msg) {
+        const n = document.createElement("div");
+        n.textContent = msg;
+        n.className = "badge flash";
+        document.body.appendChild(n);
+        setTimeout(() => n.remove(), 2000);
+      }
+    })();
+  </script>
+</body>
+</html>
