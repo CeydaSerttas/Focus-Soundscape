@@ -3,7 +3,13 @@
 A local-first, single-page **ambient sound mixer** for focus, reading, and relaxation.
 Mix different background sounds directly in your browser — no backend, no build tools.
 
+## 📸 Screenshots
 
+Light Mode:
+![Light Mode](assets/screenshots/Screenshot1.png)
+
+Dark Mode:
+![Dark Mode](assets/screenshots/Screenshot2.png)
 ## ✨ Features
 
 * 🎚 **Per-channel controls** (volume slider / mute / solo)
@@ -71,16 +77,6 @@ Add a new channel in `index.html` → `channels` array:
 ```
 
 Edit the `PRESETS` object to define new default mixes.
-
-
-## 📸 Screenshots
-
-Light Mode:
-![Light Mode](assets/screenshots/Screenshot1.png)
-
-Dark Mode:
-![Dark Mode](assets/screenshots/Screenshot2.png)
-
 
 ## 📄 License
 
