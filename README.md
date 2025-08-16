@@ -5,10 +5,10 @@ Mix different background sounds directly in your browser — no backend, no buil
 
 ## 📸 Screenshots
 
-Light Mode:
+Light Mode
 ![Light Mode](assets/screenshots/Screenshot1.png)
 
-Dark Mode:
+Dark Mode
 ![Dark Mode](assets/screenshots/Screenshot2.png)
 ## ✨ Features
 
@@ -25,7 +25,6 @@ Dark Mode:
 * ⏱ **Sleep timer** (15 / 30 / 60 / 90 min → auto stop)
 * 💾 **Save / Load / Reset** mixes
 * 📦 **Fully local** — no internet, backend, or installation required
-
 
 ## 🚀 Quick Start
 
@@ -58,7 +57,6 @@ Dark Mode:
 * **Space** → Play/Pause
 * **M** → Mute/Unmute all
 
-
 ## 🧠 Persistence (LocalStorage)
 
 * `fs_state_v2` → current mix (per-channel volume/mute/solo + master)
@@ -66,7 +64,6 @@ Dark Mode:
 * `fs_theme` → theme preference
 
 📌 All data stays on your device.
-
 
 ## 🔧 Customization
 
